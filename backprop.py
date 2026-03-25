@@ -3,7 +3,7 @@ import random
 def random_weight():
     return round(random.uniform(-1, 1), 4)
 
-lr = 0.0001
+lr = 0.01
 epochs = 500
 
 def train_network(X, Y, l_rate=None, n_epochs=None):

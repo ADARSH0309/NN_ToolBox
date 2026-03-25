@@ -4,6 +4,7 @@ import pandas as pd
 from backprop import train_network, predict, DEFAULT_LR, DEFAULT_EPOCHS
 from perceptron import train_perceptron, predict_perceptron, DEFAULT_LR as P_DEFAULT_LR, DEFAULT_EPOCHS as P_DEFAULT_EPOCHS
 from rnn import train_rnn, DEFAULT_HIDDEN as R_DEFAULT_HIDDEN, DEFAULT_LR as R_DEFAULT_LR, DEFAULT_EPOCHS as R_DEFAULT_EPOCHS
+from lstm import train_lstm, DEFAULT_HIDDEN as L_DEFAULT_HIDDEN, DEFAULT_LR as L_DEFAULT_LR, DEFAULT_EPOCHS as L_DEFAULT_EPOCHS
 from mse import train_mse_single, predict_single, train_mse_dual, predict_dual, DEFAULT_LR as M_DEFAULT_LR, DEFAULT_EPOCHS as M_DEFAULT_EPOCHS
 from visualizations import (
     plot_decision_boundary, plot_confidence_heatmap, plot_weight_heatmap_mlp,
@@ -160,6 +161,67 @@ def rnn_diagram():
     """
 
 
+def lstm_diagram():
+    return """
+    <html>
+    <head>
+        <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+        <style>
+            body { margin: 0; background: transparent; }
+            #network { width: 100%; height: 500px; border: 1px solid #444; border-radius: 8px; background: #1e1e1e; }
+        </style>
+    </head>
+    <body>
+        <div id="network"></div>
+        <script>
+            var nodes = new vis.DataSet([
+                {id: 1, label: 'x_t\\n(Input)', color: '#4CAF50', font: {color: 'white'}, x: -350, y: 0},
+                {id: 2, label: 'Embed', color: '#66BB6A', font: {color: 'white'}, shape: 'box', x: -200, y: 0},
+                {id: 3, label: 'f_t\\n(Forget)', color: '#F44336', font: {color: 'white'}, x: 0, y: -150},
+                {id: 4, label: 'i_t\\n(Input)', color: '#2196F3', font: {color: 'white'}, x: 0, y: -50},
+                {id: 5, label: 'g_t\\n(Candidate)', color: '#9C27B0', font: {color: 'white'}, x: 0, y: 50},
+                {id: 6, label: 'o_t\\n(Output)', color: '#FF9800', font: {color: 'white'}, x: 0, y: 150},
+                {id: 7, label: 'c_t\\n(Cell)', color: '#607D8B', font: {color: 'white'}, size: 40, x: 200, y: 0},
+                {id: 8, label: 'h_t\\n(Hidden)', color: '#E91E63', font: {color: 'white'}, size: 40, x: 350, y: 0},
+                {id: 9, label: 'y\\n(Output)', color: '#FF5722', font: {color: 'white'}, x: 500, y: 0},
+                {id: 10, label: 'h_{t-1}', color: '#9E9E9E', font: {color: 'white'}, shape: 'box', x: -200, y: 200},
+                {id: 11, label: 'c_{t-1}', color: '#9E9E9E', font: {color: 'white'}, shape: 'box', x: -200, y: -200}
+            ]);
+
+            var edges = new vis.DataSet([
+                {from: 1, to: 2, color: '#aaa'},
+                {from: 2, to: 3, color: '#aaa', font: {color: '#fff', strokeWidth: 0}},
+                {from: 2, to: 4, color: '#aaa'},
+                {from: 2, to: 5, color: '#aaa'},
+                {from: 2, to: 6, color: '#aaa'},
+                {from: 10, to: 3, color: '#666', dashes: true},
+                {from: 10, to: 4, color: '#666', dashes: true},
+                {from: 10, to: 5, color: '#666', dashes: true},
+                {from: 10, to: 6, color: '#666', dashes: true},
+                {from: 11, to: 7, label: 'f*c', color: '#F44336', font: {color: '#fff', strokeWidth: 0}},
+                {from: 3, to: 7, label: 'forget', color: '#F44336', font: {color: '#fff', strokeWidth: 0}},
+                {from: 4, to: 7, label: 'i*g', color: '#2196F3', font: {color: '#fff', strokeWidth: 0}},
+                {from: 5, to: 7, color: '#9C27B0'},
+                {from: 6, to: 8, label: 'gate', color: '#FF9800', font: {color: '#fff', strokeWidth: 0}},
+                {from: 7, to: 8, label: 'tanh', color: '#607D8B', font: {color: '#fff', strokeWidth: 0}, width: 2},
+                {from: 8, to: 9, label: 'W_hy', color: '#FF5722', font: {color: '#fff', strokeWidth: 0}, width: 2}
+            ]);
+
+            var container = document.getElementById('network');
+            var data = {nodes: nodes, edges: edges};
+            var options = {
+                nodes: { shape: 'circle', size: 30, font: {size: 11} },
+                edges: { arrows: 'to', smooth: {type: 'curvedCW', roundness: 0.1} },
+                physics: { enabled: false },
+                interaction: { dragNodes: true, dragView: true, zoomView: true }
+            };
+            var network = new vis.Network(container, data, options);
+        </script>
+    </body>
+    </html>
+    """
+
+
 def mse_diagram():
     return """
     <html>
@@ -254,225 +316,15 @@ st.sidebar.header("Select Model")
 st.markdown("""<style>div[data-baseweb="select"] input {caret-color: transparent !important;}</style>""", unsafe_allow_html=True)
 model_type = st.sidebar.selectbox(
     "Choose Neural Network Type",
-    ["MLP (Multi-Layer Perceptron)", "Backpropagation", "Perceptron", "RNN (Sentiment Analysis)", "MSE Loss (Linear Regression)", "Loss Functions Explained"]
+    ["Backpropagation", "Perceptron", "RNN (Sentiment Analysis)", "LSTM (Sentiment Analysis)", "MSE Loss (Linear Regression)"]
 )
 
 st.sidebar.divider()
 
 # ============================================
-# MLP (Multi-Layer Perceptron) — Architecture
-# ============================================
-if model_type == "MLP (Multi-Layer Perceptron)":
-    st.sidebar.header("MLP Parameters")
-    st.sidebar.subheader("Initial Weights")
-    st.sidebar.info("Random (generated on each training run)")
-    b_lr = st.sidebar.number_input("Learning Rate", min_value=0.00001, max_value=1.0, value=DEFAULT_LR, step=0.0001, format="%.5f")
-    b_epochs = st.sidebar.number_input("Epochs", min_value=10, max_value=5000, value=DEFAULT_EPOCHS, step=50)
-
-    st.header("MLP — Multi-Layer Perceptron")
-    st.caption("A feedforward neural network: Input Layer → Hidden Layer → Output Layer")
-
-    tab1, tab2, tab3, tab4 = st.tabs(["Upload & Train", "Predict", "Visualizations", "Architecture"])
-
-    with tab1:
-        st.subheader("Step 1: Upload CSV File")
-        st.info("CSV format: First 2 columns = features, Last column = label (0 or 1)")
-
-        uploaded_file = st.file_uploader("Choose a CSV file", type="csv", key="mlp_upload")
-        use_sample = st.checkbox("Use sample data instead", key="mlp_sample")
-
-        if use_sample:
-            df = pd.read_csv("sample_data.csv")
-            st.write("Sample Data (Student Performance):")
-            st.dataframe(df, use_container_width=True)
-            X = df.iloc[:, :2].values.tolist()
-            Y = df.iloc[:, -1].values.tolist()
-            st.session_state.col_names = [df.columns[0], df.columns[1]]
-        elif uploaded_file is not None:
-            df = pd.read_csv(uploaded_file)
-            st.write("Uploaded Data:")
-            st.dataframe(df, use_container_width=True)
-            X = df.iloc[:, :2].values.tolist()
-            Y = df.iloc[:, -1].values.tolist()
-            st.session_state.col_names = [df.columns[0], df.columns[1]]
-        else:
-            X = None
-            Y = None
-
-        st.subheader("Step 2: Train MLP")
-
-        if X is not None and Y is not None:
-            if st.button("Train MLP", type="primary", key="mlp_train"):
-                with st.spinner("Training..."):
-                    weights, loss_history, init_weights = train_network(X, Y, l_rate=b_lr, n_epochs=b_epochs)
-                    st.session_state.trained = True
-                    st.session_state.weights = weights
-                    st.session_state.loss_history = loss_history
-                    st.session_state.model_type = "mlp"
-                    st.session_state.mlp_X = X
-                    st.session_state.mlp_Y = Y
-
-                st.success("Training Complete!")
-
-                iw1, iw2, iw3, iw4, iw5, iw6, _, _, _ = init_weights
-                st.subheader("Initial Random Weights")
-                icol1, icol2 = st.columns(2)
-                with icol1:
-                    st.write(f"w1: {iw1}  w3: {iw3}  w5: {iw5}")
-                with icol2:
-                    st.write(f"w2: {iw2}  w4: {iw4}  w6: {iw6}")
-
-                w1, w2, w3, w4, w5, w6, bh1, bh2, bo = weights
-                st.subheader("Trained Weights")
-                wcol1, wcol2, wcol3 = st.columns(3)
-                with wcol1:
-                    st.write(f"w1: {w1:.6f}")
-                    st.write(f"w2: {w2:.6f}")
-                    st.write(f"w3: {w3:.6f}")
-                with wcol2:
-                    st.write(f"w4: {w4:.6f}")
-                    st.write(f"w5: {w5:.6f}")
-                    st.write(f"w6: {w6:.6f}")
-                with wcol3:
-                    st.write(f"bh1: {bh1:.6f}")
-                    st.write(f"bh2: {bh2:.6f}")
-                    st.write(f"bo: {bo:.6f}")
-
-                st.subheader("Training Loss Over Epochs")
-                loss_df = pd.DataFrame({'Epoch': range(1, len(loss_history) + 1), 'Loss': loss_history})
-                st.line_chart(loss_df.set_index('Epoch'))
-        else:
-            st.warning("Please upload a CSV file or use sample data to train.")
-
-    with tab2:
-        st.subheader("Predict Output")
-
-        if st.session_state.trained and st.session_state.model_type == "mlp":
-            st.success("Model is trained and ready!")
-            col_names = st.session_state.get('col_names', ['Feature 1', 'Feature 2'])
-
-            pcol1, pcol2 = st.columns(2)
-            with pcol1:
-                pred_x1 = st.number_input(col_names[0], value=5.0, key="mlp_x1")
-            with pcol2:
-                pred_x2 = st.number_input(col_names[1], value=75.0, key="mlp_x2")
-
-            if st.button("Predict", type="primary", key="mlp_predict"):
-                o, predicted_class = predict(pred_x1, pred_x2, st.session_state.weights)
-
-                st.subheader("Prediction Result")
-                st.metric("Raw Output (o)", f"{o:.6f}")
-                st.metric("Predicted Class", "Pass" if predicted_class == 1 else "Fail")
-                st.progress(o)
-                st.caption(f"Probability of Pass: {o*100:.2f}%")
-        else:
-            st.warning("Please train the MLP first.")
-
-    with tab3:
-        st.subheader("Visualizations")
-        if st.session_state.get("trained") and st.session_state.get("model_type") == "mlp":
-            viz_type = st.selectbox("Select Visualization", [
-                "Decision Boundary", "Confidence Heatmap", "Weight Heatmap",
-                "Confusion Matrix", "Activation Distribution", "Loss Curve"
-            ], key="mlp_viz")
-
-            weights = st.session_state.weights
-            X_data = st.session_state.get("bp_X") or st.session_state.get("mlp_X")
-            Y_data = st.session_state.get("bp_Y") or st.session_state.get("mlp_Y")
-
-            if viz_type == "Decision Boundary" and X_data:
-                fig = plot_decision_boundary(X_data, Y_data, lambda x1, x2: predict(x1, x2, weights), "MLP Decision Boundary", theme=_t)
-                st.plotly_chart(fig, use_container_width=True)
-                st.caption("Green region = Class 1, Red region = Class 0. The boundary shows where the model switches its prediction.")
-
-            elif viz_type == "Confidence Heatmap" and X_data:
-                fig = plot_confidence_heatmap(X_data, Y_data, lambda x1, x2: predict(x1, x2, weights), "MLP Confidence Map", theme=_t)
-                st.plotly_chart(fig, use_container_width=True)
-                st.caption("Brighter green = high confidence for Class 1, Brighter red = high confidence for Class 0. Dashed line = decision boundary.")
-
-            elif viz_type == "Weight Heatmap":
-                fig = plot_weight_heatmap_mlp(weights, "MLP Trained Weight Heatmap", theme=_t)
-                st.plotly_chart(fig, use_container_width=True)
-                st.caption("Blue = positive weight, Red = negative weight. Stronger color = larger magnitude.")
-
-            elif viz_type == "Confusion Matrix" and X_data:
-                y_pred = [predict(x[0], x[1], weights)[1] for x in X_data]
-                fig, metrics = plot_confusion_matrix(Y_data, y_pred, "MLP Confusion Matrix", theme=_t)
-                st.plotly_chart(fig, use_container_width=True)
-                mcol1, mcol2, mcol3, mcol4 = st.columns(4)
-                mcol1.metric("Accuracy", f"{metrics['accuracy']*100:.1f}%")
-                mcol2.metric("Precision", f"{metrics['precision']*100:.1f}%")
-                mcol3.metric("Recall", f"{metrics['recall']*100:.1f}%")
-                mcol4.metric("F1 Score", f"{metrics['f1']*100:.1f}%")
-
-            elif viz_type == "Activation Distribution" and X_data:
-                fig = plot_activation_distribution(X_data, weights, "MLP Neuron Activations", theme=_t)
-                st.plotly_chart(fig, use_container_width=True)
-                st.caption("Shows how each neuron responds across all data points. Ideally, outputs should cluster near 0 or 1.")
-
-            elif viz_type == "Loss Curve" and st.session_state.get("loss_history"):
-                fig = plot_loss_curve(st.session_state.loss_history, "MLP Training Loss", theme=_t)
-                st.plotly_chart(fig, use_container_width=True)
-                st.caption("Lower loss = better fit. The curve should decrease and flatten over time.")
-        else:
-            st.warning("Train the MLP first to see visualizations.")
-
-    with tab4:
-        st.subheader("MLP Network Architecture")
-        st.caption("Drag nodes to move, scroll to zoom, drag background to pan")
-        components.html(backprop_diagram(), height=520)
-
-        st.divider()
-        st.subheader("What is an MLP?")
-        st.markdown("""
-An **MLP (Multi-Layer Perceptron)** is a feedforward neural network with:
-- **Input Layer** — receives raw features (e.g. study hours, attendance)
-- **Hidden Layer(s)** — learns non-linear patterns using weighted sums + activation functions
-- **Output Layer** — produces the final prediction
-
-It is the **architecture** (structure) of the network — how neurons are connected in layers.
-""")
-
-        st.divider()
-        st.subheader("Step 1: Input Layer → Hidden Layer")
-        st.markdown("Each hidden neuron computes a **weighted sum** of all inputs + bias:")
-        st.latex(r"z_{h1} = x_1 \cdot w_1 + x_2 \cdot w_3 + b_{h1}")
-        st.latex(r"z_{h2} = x_1 \cdot w_2 + x_2 \cdot w_4 + b_{h2}")
-        st.code("""zh1 = x1 * w1 + x2 * w3 + bh1
-zh2 = x1 * w2 + x2 * w4 + bh2""", language="python")
-
-        st.divider()
-        st.subheader("Step 2: Activation Function (Sigmoid)")
-        st.markdown("Applies **non-linearity** so the network can learn complex patterns:")
-        st.latex(r"h_1 = \sigma(z_{h1}) = \frac{1}{1 + e^{-z_{h1}}}")
-        st.latex(r"h_2 = \sigma(z_{h2}) = \frac{1}{1 + e^{-z_{h2}}}")
-        st.code("""h1 = 1 / (1 + e^(-zh1))
-h2 = 1 / (1 + e^(-zh2))""", language="python")
-
-        st.divider()
-        st.subheader("Step 3: Hidden Layer → Output Layer")
-        st.markdown("The output neuron combines hidden outputs:")
-        st.latex(r"z_o = h_1 \cdot w_5 + h_2 \cdot w_6 + b_o")
-        st.latex(r"o = \sigma(z_o) = \frac{1}{1 + e^{-z_o}}")
-        st.code("""zo = h1 * w5 + h2 * w6 + bo
-o = 1 / (1 + e^(-zo))  # final prediction (0 to 1)""", language="python")
-
-        st.divider()
-        st.subheader("MLP vs Backpropagation")
-        st.markdown("""
-| | MLP | Backpropagation |
-|---|---|---|
-| **Type** | Network **architecture** | Training **algorithm** |
-| **What it does** | Defines layers & connections | Computes gradients & updates weights |
-| **Analogy** | The car (structure) | The engine (learning mechanism) |
-
-> Select **"Backpropagation"** from the sidebar to see how the training algorithm works step by step.
-""")
-
-# ============================================
 # BACKPROPAGATION — Training Algorithm
 # ============================================
-elif model_type == "Backpropagation":
+if model_type == "Backpropagation":
     st.sidebar.header("Backprop Parameters")
     st.sidebar.subheader("Initial Weights")
     st.sidebar.info("Random (generated on each training run)")
@@ -495,16 +347,23 @@ elif model_type == "Backpropagation":
             df = pd.read_csv("sample_data.csv")
             st.write("Sample Data (Student Performance):")
             st.dataframe(df, use_container_width=True)
-            X = df.iloc[:, :2].values.tolist()
-            Y = df.iloc[:, -1].values.tolist()
-            st.session_state.col_names = [df.columns[0], df.columns[1]]
+            st.session_state.bp_df = df
         elif uploaded_file is not None:
             df = pd.read_csv(uploaded_file)
             st.write("Uploaded Data:")
             st.dataframe(df, use_container_width=True)
-            X = df.iloc[:, :2].values.tolist()
+            st.session_state.bp_df = df
+
+        if "bp_df" in st.session_state:
+            df = st.session_state.bp_df
+            raw_X = df.iloc[:, :2].values
+            x_min = raw_X.min(axis=0)
+            x_max = raw_X.max(axis=0)
+            X = ((raw_X - x_min) / (x_max - x_min + 1e-8)).tolist()
             Y = df.iloc[:, -1].values.tolist()
             st.session_state.col_names = [df.columns[0], df.columns[1]]
+            st.session_state.bp_x_min = x_min
+            st.session_state.bp_x_max = x_max
         else:
             X = None
             Y = None
@@ -722,16 +581,23 @@ elif model_type == "Perceptron":
             df = pd.read_csv("sample_data.csv")
             st.write("Sample Data (Student Performance):")
             st.dataframe(df, use_container_width=True)
-            X = df.iloc[:, :2].values.tolist()
-            Y = df.iloc[:, -1].values.tolist()
-            st.session_state.col_names = [df.columns[0], df.columns[1]]
+            st.session_state.perceptron_df = df
         elif uploaded_file is not None:
             df = pd.read_csv(uploaded_file)
             st.write("Uploaded Data:")
             st.dataframe(df, use_container_width=True)
-            X = df.iloc[:, :2].values.tolist()
+            st.session_state.perceptron_df = df
+
+        if "perceptron_df" in st.session_state:
+            df = st.session_state.perceptron_df
+            raw_X = df.iloc[:, :2].values
+            x_min = raw_X.min(axis=0)
+            x_max = raw_X.max(axis=0)
+            X = ((raw_X - x_min) / (x_max - x_min + 1e-8)).tolist()
             Y = df.iloc[:, -1].values.tolist()
             st.session_state.col_names = [df.columns[0], df.columns[1]]
+            st.session_state.perceptron_x_min = x_min
+            st.session_state.perceptron_x_max = x_max
         else:
             X = None
             Y = None
@@ -887,17 +753,23 @@ elif model_type == "RNN (Sentiment Analysis)":
             df = pd.read_csv("sample_sentiment.csv")
             st.write("Sample Sentiment Data:")
             st.dataframe(df, use_container_width=True)
-            texts = df["text"].tolist()
-            labels = df["sentiment"].tolist()
+            st.session_state.rnn_df = df
+            st.session_state.rnn_text_col_name = "text"
+            st.session_state.rnn_label_col_name = "sentiment"
         elif uploaded_file is not None:
             df = pd.read_csv(uploaded_file)
             st.write("Uploaded Data:")
             st.dataframe(df, use_container_width=True)
-            # Auto-detect text and label columns
+            st.session_state.rnn_df = df
             text_col = st.selectbox("Select text column", df.columns, index=0, key="rnn_text_col")
             label_col = st.selectbox("Select label column (0/1)", df.columns, index=min(1, len(df.columns) - 1), key="rnn_label_col")
-            texts = df[text_col].astype(str).tolist()
-            labels = df[label_col].astype(int).tolist()
+            st.session_state.rnn_text_col_name = text_col
+            st.session_state.rnn_label_col_name = label_col
+
+        if "rnn_df" in st.session_state:
+            df = st.session_state.rnn_df
+            texts = df[st.session_state.rnn_text_col_name].astype(str).tolist()
+            labels = df[st.session_state.rnn_label_col_name].astype(int).tolist()
         else:
             texts = None
             labels = None
@@ -1089,6 +961,259 @@ y = sigmoid(logit)  # 0..1 probability""", language="python")
     dh = dtanh @ W_hh.T  # propagate to previous step""", language="python")
 
 # ============================================
+# LSTM (Sentiment Analysis)
+# ============================================
+elif model_type == "LSTM (Sentiment Analysis)":
+    st.header("LSTM — Long Short-Term Memory")
+    st.caption("An advanced recurrent network with gates that control memory flow")
+
+    st.sidebar.header("LSTM Parameters")
+    l_hidden = st.sidebar.number_input("Hidden Size", min_value=8, max_value=256, value=L_DEFAULT_HIDDEN, step=8, key="l_hidden")
+    l_lr = st.sidebar.number_input("Learning Rate", min_value=0.0001, max_value=1.0, value=L_DEFAULT_LR, step=0.001, format="%.4f", key="l_lr")
+    l_epochs = st.sidebar.number_input("Epochs", min_value=5, max_value=500, value=L_DEFAULT_EPOCHS, step=5, key="l_epochs")
+
+    tab1, tab2, tab3, tab4 = st.tabs(["Upload & Train", "Predict", "Visualizations", "Architecture"])
+
+    # ── Tab 1: Upload & Train ────────────────────────────────
+    with tab1:
+        st.subheader("Step 1: Upload Sentiment CSV")
+        st.info("CSV format: A **text** column and a **sentiment** column (0 = Negative, 1 = Positive)")
+
+        uploaded_file = st.file_uploader("Choose a CSV file", type="csv", key="lstm_upload")
+        use_sample = st.checkbox("Use sample sentiment data instead", key="lstm_sample")
+
+        if use_sample:
+            df = pd.read_csv("sample_sentiment.csv")
+            st.write("Sample Sentiment Data:")
+            st.dataframe(df, use_container_width=True)
+            st.session_state.lstm_df = df
+            st.session_state.lstm_text_col_name = "text"
+            st.session_state.lstm_label_col_name = "sentiment"
+        elif uploaded_file is not None:
+            df = pd.read_csv(uploaded_file)
+            st.write("Uploaded Data:")
+            st.dataframe(df, use_container_width=True)
+            st.session_state.lstm_df = df
+            text_col = st.selectbox("Select text column", df.columns, index=0, key="lstm_text_col")
+            label_col = st.selectbox("Select label column (0/1)", df.columns, index=min(1, len(df.columns) - 1), key="lstm_label_col")
+            st.session_state.lstm_text_col_name = text_col
+            st.session_state.lstm_label_col_name = label_col
+
+        if "lstm_df" in st.session_state:
+            df = st.session_state.lstm_df
+            texts = df[st.session_state.lstm_text_col_name].astype(str).tolist()
+            labels = df[st.session_state.lstm_label_col_name].astype(int).tolist()
+        else:
+            texts = None
+            labels = None
+
+        st.subheader("Step 2: Train LSTM")
+
+        if texts is not None and labels is not None:
+            pos_count = sum(labels)
+            neg_count = len(labels) - pos_count
+            st.write(f"**Dataset:** {len(labels)} samples — {pos_count} Positive, {neg_count} Negative")
+
+            if st.button("Train LSTM", type="primary", key="lstm_train"):
+                with st.spinner("Training LSTM (this may take a moment)..."):
+                    model, vocab, loss_hist, acc_hist = train_lstm(
+                        texts, labels,
+                        hidden_size=l_hidden, lr=l_lr, epochs=l_epochs
+                    )
+                    st.session_state.trained = True
+                    st.session_state.lstm_model = model
+                    st.session_state.lstm_vocab = vocab
+                    st.session_state.loss_history = loss_hist
+                    st.session_state.lstm_acc_history = acc_hist
+                    st.session_state.model_type = "lstm"
+                    st.session_state.lstm_texts = texts
+                    st.session_state.lstm_labels = labels
+
+                st.success("Training Complete!")
+
+                st.write(f"**Vocab size:** {len(vocab)} words  |  **Hidden size:** {l_hidden}")
+
+                col_l, col_r = st.columns(2)
+                with col_l:
+                    st.subheader("Training Loss")
+                    loss_df = pd.DataFrame({"Epoch": range(1, len(loss_hist) + 1), "Loss": loss_hist})
+                    st.line_chart(loss_df.set_index("Epoch"))
+                with col_r:
+                    st.subheader("Training Accuracy")
+                    acc_df = pd.DataFrame({"Epoch": range(1, len(acc_hist) + 1), "Accuracy": acc_hist})
+                    st.line_chart(acc_df.set_index("Epoch"))
+
+                final_acc = acc_hist[-1] * 100
+                st.metric("Final Training Accuracy", f"{final_acc:.1f}%")
+        else:
+            st.warning("Please upload a CSV file or use sample data.")
+
+    # ── Tab 2: Predict ───────────────────────────────────────
+    with tab2:
+        st.subheader("Predict Sentiment")
+
+        if st.session_state.get("model_type") == "lstm" and st.session_state.get("trained"):
+            st.success("LSTM model is trained and ready!")
+
+            input_text = st.text_area("Enter text to analyse:", height=100, key="lstm_input",
+                                       placeholder="e.g. This product is amazing and I love it!")
+
+            if st.button("Analyse Sentiment", type="primary", key="lstm_predict"):
+                if input_text.strip():
+                    model = st.session_state.lstm_model
+                    vocab = st.session_state.lstm_vocab
+                    score, label = model.predict_text(input_text, vocab)
+
+                    st.subheader("Result")
+                    rcol1, rcol2 = st.columns(2)
+                    with rcol1:
+                        if label == "Positive":
+                            st.success(f"**{label}**")
+                        else:
+                            st.error(f"**{label}**")
+                    with rcol2:
+                        st.metric("Confidence Score", f"{score:.4f}")
+
+                    st.progress(score)
+                    st.caption(f"Score: {score:.4f}  (>= 0.5 → Positive, < 0.5 → Negative)")
+                else:
+                    st.warning("Please enter some text.")
+
+            st.divider()
+            st.subheader("Batch Prediction")
+            st.info("Upload a CSV with a text column to predict sentiment for many rows at once.")
+            batch_file = st.file_uploader("Upload CSV for batch prediction", type="csv", key="lstm_batch")
+            if batch_file is not None:
+                batch_df = pd.read_csv(batch_file)
+                batch_col = st.selectbox("Select text column", batch_df.columns, key="lstm_batch_col")
+                if st.button("Run Batch Prediction", key="lstm_batch_run"):
+                    model = st.session_state.lstm_model
+                    vocab = st.session_state.lstm_vocab
+                    scores = []
+                    preds = []
+                    for t in batch_df[batch_col].astype(str):
+                        s, l = model.predict_text(t, vocab)
+                        scores.append(round(s, 4))
+                        preds.append(l)
+                    batch_df["Score"] = scores
+                    batch_df["Prediction"] = preds
+                    st.dataframe(batch_df, use_container_width=True)
+
+                    pos = preds.count("Positive")
+                    neg = preds.count("Negative")
+                    st.write(f"**Summary:** {pos} Positive, {neg} Negative out of {len(preds)} texts")
+        else:
+            st.warning("Please train the LSTM first.")
+
+    # ── Tab 3: Visualizations ────────────────────────────────
+    with tab3:
+        st.subheader("Visualizations")
+        if st.session_state.get("model_type") == "lstm" and st.session_state.get("trained"):
+            viz_type = st.selectbox("Select Visualization", [
+                "Sentiment Distribution", "Confusion Matrix", "Loss & Accuracy Curves", "Word Cloud Preview"
+            ], key="lstm_viz")
+
+            if viz_type == "Sentiment Distribution":
+                labels_data = st.session_state.get("lstm_labels", [])
+                fig = plot_sentiment_distribution(labels_data, theme=_t)
+                st.plotly_chart(fig, use_container_width=True)
+
+            elif viz_type == "Confusion Matrix":
+                model = st.session_state.lstm_model
+                vocab = st.session_state.lstm_vocab
+                texts_data = st.session_state.get("lstm_texts", [])
+                labels_data = st.session_state.get("lstm_labels", [])
+                y_pred = []
+                for t in texts_data:
+                    _, lbl = model.predict_text(t, vocab)
+                    y_pred.append(1 if lbl == "Positive" else 0)
+                fig, metrics = plot_confusion_matrix(labels_data, y_pred, "LSTM Confusion Matrix", theme=_t)
+                st.plotly_chart(fig, use_container_width=True)
+                mcol1, mcol2, mcol3, mcol4 = st.columns(4)
+                mcol1.metric("Accuracy", f"{metrics['accuracy']*100:.1f}%")
+                mcol2.metric("Precision", f"{metrics['precision']*100:.1f}%")
+                mcol3.metric("Recall", f"{metrics['recall']*100:.1f}%")
+                mcol4.metric("F1 Score", f"{metrics['f1']*100:.1f}%")
+
+            elif viz_type == "Loss & Accuracy Curves":
+                loss_hist = st.session_state.get("loss_history", [])
+                acc_hist = st.session_state.get("lstm_acc_history", [])
+                fig = plot_loss_accuracy(loss_hist, acc_hist, theme=_t)
+                st.plotly_chart(fig, use_container_width=True)
+
+            elif viz_type == "Word Cloud Preview":
+                texts_data = st.session_state.get("lstm_texts", [])
+                labels_data = st.session_state.get("lstm_labels", [])
+                from lstm import tokenize
+                fig = plot_word_frequency(texts_data, labels_data, tokenize, theme=_t)
+                st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.warning("Train the LSTM first to see visualizations.")
+
+    # ── Tab 4: Architecture ──────────────────────────────────
+    with tab4:
+        st.subheader("Network Diagram")
+        st.caption("Drag nodes to move, scroll to zoom")
+        components.html(lstm_diagram(), height=520)
+
+        st.divider()
+        st.subheader("What is LSTM?")
+        st.markdown("""
+An **LSTM (Long Short-Term Memory)** is an advanced recurrent neural network that solves the **vanishing gradient problem** of vanilla RNNs using a **cell state** and **three gates**:
+- **Forget Gate** — decides what to discard from memory
+- **Input Gate** — decides what new information to store
+- **Output Gate** — decides what to output from memory
+
+This allows LSTMs to learn **long-range dependencies** in sequences (e.g. sentiment across a long sentence).
+""")
+
+        st.divider()
+        st.subheader("Step 1: Forget Gate")
+        st.markdown("Decides how much of the previous cell state to **keep**:")
+        st.latex(r"f_t = \sigma(\mathbf{x}_t \cdot \mathbf{W}_{xf} + \mathbf{h}_{t-1} \cdot \mathbf{W}_{hf} + \mathbf{b}_f)")
+        st.code("f_t = sigmoid(x_t @ W_xf + h_prev @ W_hf + b_f)", language="python")
+
+        st.divider()
+        st.subheader("Step 2: Input Gate + Candidate")
+        st.markdown("Decides what **new information** to add to the cell state:")
+        st.latex(r"i_t = \sigma(\mathbf{x}_t \cdot \mathbf{W}_{xi} + \mathbf{h}_{t-1} \cdot \mathbf{W}_{hi} + \mathbf{b}_i)")
+        st.latex(r"\tilde{c}_t = \tanh(\mathbf{x}_t \cdot \mathbf{W}_{xg} + \mathbf{h}_{t-1} \cdot \mathbf{W}_{hg} + \mathbf{b}_g)")
+        st.code("""i_t = sigmoid(x_t @ W_xi + h_prev @ W_hi + b_i)
+g_t = tanh(x_t @ W_xg + h_prev @ W_hg + b_g)""", language="python")
+
+        st.divider()
+        st.subheader("Step 3: Cell State Update")
+        st.markdown("Combines forget and input gates to update memory:")
+        st.latex(r"c_t = f_t \odot c_{t-1} + i_t \odot \tilde{c}_t")
+        st.code("c_t = f_t * c_prev + i_t * g_t", language="python")
+
+        st.divider()
+        st.subheader("Step 4: Output Gate")
+        st.markdown("Decides what part of the cell state to **output**:")
+        st.latex(r"o_t = \sigma(\mathbf{x}_t \cdot \mathbf{W}_{xo} + \mathbf{h}_{t-1} \cdot \mathbf{W}_{ho} + \mathbf{b}_o)")
+        st.latex(r"h_t = o_t \odot \tanh(c_t)")
+        st.code("""o_t = sigmoid(x_t @ W_xo + h_prev @ W_ho + b_o)
+h_t = o_t * tanh(c_t)""", language="python")
+
+        st.divider()
+        st.subheader("Step 5: Final Output")
+        st.markdown("After processing all words, the final hidden state produces the prediction:")
+        st.latex(r"y = \sigma(\mathbf{h}_T \cdot \mathbf{W}_{hy} + \mathbf{b}_y)")
+        st.code("""y = sigmoid(h_T @ W_hy + b_y)  # 0..1 probability""", language="python")
+
+        st.divider()
+        st.subheader("LSTM vs RNN")
+        st.markdown("""
+| | RNN | LSTM |
+|---|---|---|
+| **Memory** | Short-term only | Short-term + long-term (cell state) |
+| **Gates** | None | Forget, Input, Output |
+| **Vanishing Gradient** | Severe problem | Solved by cell state |
+| **Long Sequences** | Struggles | Handles well |
+| **Parameters** | Fewer | ~4x more (4 gate weight matrices) |
+""")
+
+# ============================================
 # MSE LOSS (Linear Regression)
 # ============================================
 elif model_type == "MSE Loss (Linear Regression)":
@@ -1116,7 +1241,6 @@ elif model_type == "MSE Loss (Linear Regression)":
 
         if use_sample:
             if mse_mode == "Single Variable (1 feature)":
-                # Real-world: House size (1000 sqft) → Price (in $1000s)
                 X_single = [0.8, 1.0, 1.2, 1.4, 1.5, 1.7, 1.8, 2.0, 2.2, 2.5, 2.8, 3.0, 3.2, 3.5, 3.8, 4.0, 4.5, 5.0]
                 y_vals =   [150, 180, 200, 230, 245, 270, 290, 320, 350, 400, 440, 470, 510, 550, 590, 620, 700, 780]
                 df = pd.DataFrame({"House_Size_1000sqft": X_single, "Price_1000USD": y_vals})
@@ -1124,7 +1248,6 @@ elif model_type == "MSE Loss (Linear Regression)":
                 st.dataframe(df, use_container_width=True)
                 st.session_state.mse_col_names = ["House_Size_1000sqft"]
             else:
-                # Real-world: House size + bedrooms → Price
                 X1_vals = [0.8, 1.0, 1.2, 1.4, 1.5, 1.7, 2.0, 2.2, 2.5, 2.8, 3.0, 3.2, 3.5, 3.8, 4.0, 4.5, 5.0, 5.5]
                 X2_vals = [1,   1,   2,   2,   2,   2,   3,   3,   3,   3,   4,   4,   4,   4,   5,   5,   5,   6]
                 y_vals  = [150, 180, 210, 240, 250, 280, 340, 370, 410, 450, 490, 520, 560, 600, 640, 720, 800, 880]
@@ -1132,18 +1255,25 @@ elif model_type == "MSE Loss (Linear Regression)":
                 st.write("Sample Data — House Price vs Size & Bedrooms:")
                 st.dataframe(df, use_container_width=True)
                 st.session_state.mse_col_names = ["House_Size_1000sqft", "Bedrooms"]
+            st.session_state.mse_df = df
         elif uploaded_file is not None:
             df = pd.read_csv(uploaded_file)
             st.write("Uploaded Data:")
             st.dataframe(df)
+            st.session_state.mse_df = df
+            if mse_mode == "Single Variable (1 feature)":
+                st.session_state.mse_col_names = [df.columns[0]]
+            else:
+                st.session_state.mse_col_names = [df.columns[0], df.columns[1]]
+
+        if "mse_df" in st.session_state:
+            df = st.session_state.mse_df
             y_vals = df.iloc[:, -1].values.tolist()
             if mse_mode == "Single Variable (1 feature)":
                 X_single = df.iloc[:, 0].values.tolist()
-                st.session_state.mse_col_names = [df.columns[0]]
             else:
                 X1_vals = df.iloc[:, 0].values.tolist()
                 X2_vals = df.iloc[:, 1].values.tolist()
-                st.session_state.mse_col_names = [df.columns[0], df.columns[1]]
         else:
             df = None
             y_vals = None
