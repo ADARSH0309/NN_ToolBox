@@ -976,19 +976,28 @@ elif model_type == "LSTM (Sentiment Analysis)":
 
     # ── Tab 1: Upload & Train ────────────────────────────────
     with tab1:
-        st.subheader("Step 1: Upload Sentiment CSV")
-        st.info("CSV format: A **text** column and a **sentiment** column (0 = Negative, 1 = Positive)")
+        st.subheader("Step 1: Upload CSV File")
+        st.info("CSV format: A **text** column and a **label** column (0 or 1)")
 
         uploaded_file = st.file_uploader("Choose a CSV file", type="csv", key="lstm_upload")
-        use_sample = st.checkbox("Use sample sentiment data instead", key="lstm_sample")
+        sample_choice = st.radio("Or use sample data:", ["None", "Sentiment Analysis", "Music Genre Classification"], key="lstm_sample_choice", horizontal=True)
 
-        if use_sample:
+        if sample_choice == "Sentiment Analysis":
             df = pd.read_csv("sample_sentiment.csv")
             st.write("Sample Sentiment Data:")
             st.dataframe(df, use_container_width=True)
+            st.download_button("Download Sentiment CSV", df.to_csv(index=False), "sample_sentiment.csv", "text/csv", key="dl_sentiment")
             st.session_state.lstm_df = df
             st.session_state.lstm_text_col_name = "text"
             st.session_state.lstm_label_col_name = "sentiment"
+        elif sample_choice == "Music Genre Classification":
+            df = pd.read_csv("sample_music_genre.csv")
+            st.write("Sample Music Genre Data (0 = Calm/Soft, 1 = Heavy/Rock):")
+            st.dataframe(df, use_container_width=True)
+            st.download_button("Download Music Genre CSV", df.to_csv(index=False), "sample_music_genre.csv", "text/csv", key="dl_music")
+            st.session_state.lstm_df = df
+            st.session_state.lstm_text_col_name = "text"
+            st.session_state.lstm_label_col_name = "genre"
         elif uploaded_file is not None:
             df = pd.read_csv(uploaded_file)
             st.write("Uploaded Data:")
