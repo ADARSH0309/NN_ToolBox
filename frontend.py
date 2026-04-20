@@ -6,6 +6,8 @@ from perceptron import train_perceptron, predict_perceptron, DEFAULT_LR as P_DEF
 from rnn import train_rnn, DEFAULT_HIDDEN as R_DEFAULT_HIDDEN, DEFAULT_LR as R_DEFAULT_LR, DEFAULT_EPOCHS as R_DEFAULT_EPOCHS
 from lstm import train_lstm, DEFAULT_HIDDEN as L_DEFAULT_HIDDEN, DEFAULT_LR as L_DEFAULT_LR, DEFAULT_EPOCHS as L_DEFAULT_EPOCHS
 from mse import train_mse_single, predict_single, train_mse_dual, predict_dual, DEFAULT_LR as M_DEFAULT_LR, DEFAULT_EPOCHS as M_DEFAULT_EPOCHS
+from cnn import train_cnn, preprocess_image, detect_face_pil, augment_image, FaceCNN, DEFAULT_LR as C_DEFAULT_LR, DEFAULT_EPOCHS as C_DEFAULT_EPOCHS, IMG_SIZE
+from hopfield import HopfieldNetwork, ALPHABET_PATTERNS, GRID_SIZE, PATTERN_SIZE, get_pattern_vector
 from visualizations import (
     plot_decision_boundary, plot_confidence_heatmap, plot_weight_heatmap_mlp,
     plot_confusion_matrix, plot_activation_distribution, plot_loss_curve,
@@ -267,6 +269,61 @@ def mse_diagram():
     """
 
 
+def cnn_diagram():
+    return """
+    <html>
+    <head>
+        <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+        <style>
+            body { margin: 0; background: transparent; }
+            #network { width: 100%; height: 500px; border: 1px solid #444; border-radius: 8px; background: #1e1e1e; }
+        </style>
+    </head>
+    <body>
+        <div id="network"></div>
+        <script>
+            var nodes = new vis.DataSet([
+                {id: 1, label: 'Input\\n32x32x1', color: '#4CAF50', font: {color: 'white'}, shape: 'box', x: -400, y: 0},
+                {id: 2, label: 'Conv1\\n3x3, 8 filters', color: '#2196F3', font: {color: 'white'}, shape: 'box', x: -250, y: 0},
+                {id: 3, label: 'ReLU', color: '#FF9800', font: {color: 'white'}, shape: 'box', x: -130, y: 0},
+                {id: 4, label: 'MaxPool\\n2x2', color: '#9C27B0', font: {color: 'white'}, shape: 'box', x: -10, y: 0},
+                {id: 5, label: 'Conv2\\n3x3, 16 filters', color: '#2196F3', font: {color: 'white'}, shape: 'box', x: 130, y: 0},
+                {id: 6, label: 'ReLU', color: '#FF9800', font: {color: 'white'}, shape: 'box', x: 240, y: 0},
+                {id: 7, label: 'MaxPool\\n2x2', color: '#9C27B0', font: {color: 'white'}, shape: 'box', x: 350, y: 0},
+                {id: 8, label: 'Flatten', color: '#607D8B', font: {color: 'white'}, shape: 'box', x: 460, y: 0},
+                {id: 9, label: 'FC1\\n(64)', color: '#E91E63', font: {color: 'white'}, shape: 'box', x: 570, y: 0},
+                {id: 10, label: 'ReLU', color: '#FF9800', font: {color: 'white'}, shape: 'box', x: 660, y: 0},
+                {id: 11, label: 'FC2\\n(classes)', color: '#F44336', font: {color: 'white'}, shape: 'box', x: 770, y: 0},
+                {id: 12, label: 'Softmax', color: '#00BCD4', font: {color: 'white'}, shape: 'box', x: 880, y: 0}
+            ]);
+            var edges = new vis.DataSet([
+                {from: 1, to: 2, color: '#aaa'},
+                {from: 2, to: 3, color: '#aaa'},
+                {from: 3, to: 4, color: '#aaa'},
+                {from: 4, to: 5, color: '#aaa'},
+                {from: 5, to: 6, color: '#aaa'},
+                {from: 6, to: 7, color: '#aaa'},
+                {from: 7, to: 8, color: '#aaa'},
+                {from: 8, to: 9, color: '#aaa'},
+                {from: 9, to: 10, color: '#aaa'},
+                {from: 10, to: 11, color: '#aaa'},
+                {from: 11, to: 12, color: '#aaa'}
+            ]);
+            var container = document.getElementById('network');
+            var data = {nodes: nodes, edges: edges};
+            var options = {
+                nodes: { shape: 'box', size: 30, font: {size: 11} },
+                edges: { arrows: 'to', smooth: {type: 'curvedCW', roundness: 0.05} },
+                physics: { enabled: false },
+                interaction: { dragNodes: true, dragView: true, zoomView: true }
+            };
+            var network = new vis.Network(container, data, options);
+        </script>
+    </body>
+    </html>
+    """
+
+
 st.set_page_config(page_title="Neural Network Toolbox", layout="wide")
 
 # ── Theme Toggle ─────────────────────────────────────────────
@@ -316,7 +373,7 @@ st.sidebar.header("Select Model")
 st.markdown("""<style>div[data-baseweb="select"] input {caret-color: transparent !important;}</style>""", unsafe_allow_html=True)
 model_type = st.sidebar.selectbox(
     "Choose Neural Network Type",
-    ["Backpropagation", "Perceptron", "RNN (Sentiment Analysis)", "LSTM (Sentiment Analysis)", "MSE Loss (Linear Regression)"]
+    ["Backpropagation", "Perceptron", "RNN (Sentiment Analysis)", "LSTM (Sentiment Analysis)", "MSE Loss (Linear Regression)", "CNN (Face Classification)", "Hopfield Network (Alphabet)"]
 )
 
 st.sidebar.divider()
@@ -334,7 +391,7 @@ if model_type == "Backpropagation":
     st.header("Backpropagation — Training Algorithm")
     st.caption("The algorithm that teaches neural networks by propagating errors backward")
 
-    tab1, tab2, tab3, tab4 = st.tabs(["Upload & Train", "Step-by-Step Trace", "Visualizations", "Algorithm"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Upload & Train", "Predict", "Step-by-Step Trace", "Visualizations", "Algorithm"])
 
     with tab1:
         st.subheader("Step 1: Upload CSV File")
@@ -402,6 +459,37 @@ if model_type == "Backpropagation":
             st.warning("Please upload a CSV file or use sample data to train.")
 
     with tab2:
+        st.subheader("Predict Output")
+        
+        if st.session_state.trained and st.session_state.model_type == "backprop":
+            st.success("Model is trained and ready!")
+            col_names = st.session_state.get('col_names', ['Feature 1', 'Feature 2'])
+
+            pcol1, pcol2 = st.columns(2)
+            with pcol1:
+                pred_x1 = st.number_input(col_names[0], value=0.5, key="bp_x1")
+            with pcol2:
+                pred_x2 = st.number_input(col_names[1], value=0.5, key="bp_x2")
+
+            if st.button("Predict", type="primary", key="bp_predict"):
+                # Scale input if needed based on training data ranges
+                if "bp_x_min" in st.session_state and "bp_x_max" in st.session_state:
+                    xmin = st.session_state.bp_x_min
+                    xmax = st.session_state.bp_x_max
+                    sc_x1 = (pred_x1 - xmin[0]) / (xmax[0] - xmin[0] + 1e-8)
+                    sc_x2 = (pred_x2 - xmin[1]) / (xmax[1] - xmin[1] + 1e-8)
+                else:
+                    sc_x1, sc_x2 = pred_x1, pred_x2
+
+                score, pred = predict(sc_x1, sc_x2, st.session_state.weights)
+
+                st.subheader("Prediction Result")
+                st.metric("Model Output (Activation)", f"{score:.6f}")
+                st.metric("Predicted Class", "Class 1" if pred == 1 else "Class 0")
+        else:
+            st.warning("Please train the backpropagation model first.")
+
+    with tab3:
         st.subheader("Step-by-Step Trace (1 Sample)")
         st.markdown("See exactly how backpropagation processes **one data point**:")
 
@@ -446,7 +534,7 @@ if model_type == "Backpropagation":
         else:
             st.warning("Train the model first (go to Upload & Train tab).")
 
-    with tab3:
+    with tab4:
         st.subheader("Visualizations")
         if st.session_state.get("model_type") == "backprop" and st.session_state.get("trained"):
             viz_type = st.selectbox("Select Visualization", [
@@ -491,7 +579,7 @@ if model_type == "Backpropagation":
         else:
             st.warning("Train with backpropagation first to see visualizations.")
 
-    with tab4:
+    with tab5:
         st.subheader("Backpropagation Algorithm")
         st.caption("How neural networks learn by propagating errors backward through layers")
         components.html(backprop_diagram(), height=520)
@@ -1458,3 +1546,655 @@ db = (2 / n) * db""", language="python")
         st.latex(r"b = b - \eta \cdot \frac{\partial \text{MSE}}{\partial b}")
         st.code("""w = w - learning_rate * dw
 b = b - learning_rate * db""", language="python")
+
+# ============================================
+# CNN (Face Classification)
+# ============================================
+elif model_type == "CNN (Face Classification)":
+    import numpy as np
+    import matplotlib.pyplot as plt
+
+    st.title("CNN — Face Classification")
+
+    st.sidebar.header("CNN Parameters")
+    c_lr = st.sidebar.number_input("Learning Rate", min_value=0.0001, max_value=0.1, value=C_DEFAULT_LR, step=0.001, format="%.4f", key="c_lr")
+    c_epochs = st.sidebar.number_input("Epochs", min_value=1, max_value=100, value=C_DEFAULT_EPOCHS, step=1, key="c_epochs")
+    c_augment = st.sidebar.checkbox("Data Augmentation", value=True, key="c_augment")
+
+    _t = st.session_state.theme
+
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Upload & Train", "Predict", "Visualizations", "Architecture", "Live Attendance"])
+
+    # ── Tab 1: Upload & Train ─────────────────────────────────
+    with tab1:
+        st.subheader("Upload Face Images")
+        st.markdown("Upload images for **each person** you want to classify. Provide at least 2-3 images per person for best results.")
+
+        num_classes = st.number_input("Number of people/classes", min_value=2, max_value=10, value=2, step=1, key="cnn_num_classes")
+
+        all_images = []
+        all_labels = []
+        class_names = []
+
+        for c in range(num_classes):
+            st.markdown(f"**Person {c + 1}**")
+            name = st.text_input(f"Name for person {c + 1}", value=f"Person {c + 1}", key=f"cnn_name_{c}")
+            class_names.append(name)
+            uploaded = st.file_uploader(f"Upload images for {name}", accept_multiple_files=True, type=["jpg", "jpeg", "png"], key=f"cnn_upload_{c}")
+            if uploaded:
+                for f in uploaded:
+                    img_bytes = f.read()
+                    face_crop, bbox, full_img = detect_face_pil(img_bytes)
+                    processed = preprocess_image(face_crop, IMG_SIZE)
+                    if c_augment:
+                        augmented = augment_image(processed)
+                        for aug in augmented:
+                            all_images.append(aug)
+                            all_labels.append(c)
+                    else:
+                        all_images.append(processed)
+                        all_labels.append(c)
+                st.success(f"Loaded {len(uploaded)} image(s) for {name}" + (f" (augmented to {len([l for l in all_labels if l == c])} samples)" if c_augment else ""))
+
+        st.divider()
+        if st.button("Train CNN", key="cnn_train_btn"):
+            if len(all_images) < 2:
+                st.error("Upload at least 1 image per class to train.")
+            else:
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                loss_chart = st.empty()
+
+                loss_history_live = []
+                acc_history_live = []
+
+                def progress_cb(epoch, total, loss, acc):
+                    progress_bar.progress(epoch / total)
+                    status_text.markdown(f"**Epoch {epoch}/{total}** — Loss: `{loss:.4f}` — Accuracy: `{acc:.2%}`")
+                    loss_history_live.append(loss)
+                    acc_history_live.append(acc)
+
+                model, loss_hist, acc_hist = train_cnn(
+                    all_images, all_labels, num_classes,
+                    lr=c_lr, epochs=c_epochs, img_size=IMG_SIZE,
+                    progress_callback=progress_cb
+                )
+
+                progress_bar.progress(1.0)
+                st.success(f"Training complete! Final accuracy: {acc_hist[-1]:.2%}")
+
+                st.session_state.cnn_model = model
+                st.session_state.cnn_class_names = class_names
+                st.session_state.cnn_loss_history = loss_hist
+                st.session_state.cnn_acc_history = acc_hist
+                st.session_state.cnn_train_images = all_images
+                st.session_state.cnn_train_labels = all_labels
+                st.session_state.model_type = "cnn"
+                st.session_state.trained = True
+
+    # ── Tab 2: Predict ──────────────────────────────────────
+    with tab2:
+        if st.session_state.get("model_type") == "cnn" and st.session_state.get("trained"):
+            st.subheader("Upload a face image to classify")
+            pred_file = st.file_uploader("Upload test image", type=["jpg", "jpeg", "png"], key="cnn_pred_upload")
+
+            if pred_file:
+                img_bytes = pred_file.read()
+                face_crop, bbox, full_img = detect_face_pil(img_bytes)
+                processed = preprocess_image(face_crop, IMG_SIZE)
+
+                model = st.session_state.cnn_model
+                class_names = st.session_state.cnn_class_names
+
+                pred_class, confidence, probs = model.predict(processed)
+
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.image(full_img, caption="Original Image", use_container_width=True)
+                with col2:
+                    st.image(face_crop, caption="Detected Face", use_container_width=True)
+
+                st.markdown(f"### Prediction: **{class_names[pred_class]}**")
+                st.markdown(f"Confidence: **{confidence:.2%}**")
+
+                st.divider()
+                st.subheader("Class Probabilities")
+                prob_data = {class_names[i]: float(probs[i]) for i in range(len(class_names))}
+                st.bar_chart(prob_data)
+
+            st.divider()
+            st.subheader("Batch Prediction")
+            batch_files = st.file_uploader("Upload multiple test images", accept_multiple_files=True, type=["jpg", "jpeg", "png"], key="cnn_batch_upload")
+            if batch_files:
+                model = st.session_state.cnn_model
+                class_names = st.session_state.cnn_class_names
+                results = []
+                for f in batch_files:
+                    img_bytes = f.read()
+                    face_crop, bbox, full_img = detect_face_pil(img_bytes)
+                    processed = preprocess_image(face_crop, IMG_SIZE)
+                    pred_class, confidence, probs = model.predict(processed)
+                    results.append({"File": f.name, "Prediction": class_names[pred_class], "Confidence": f"{confidence:.2%}"})
+                st.dataframe(results, use_container_width=True)
+        else:
+            st.warning("Train the CNN model first to make predictions.")
+
+    # ── Tab 3: Visualizations ───────────────────────────────
+    with tab3:
+        if st.session_state.get("model_type") == "cnn" and st.session_state.get("trained"):
+            viz_type = st.selectbox("Select Visualization", [
+                "Loss & Accuracy Curves",
+                "Feature Maps",
+                "Conv Filters",
+                "Confusion Matrix"
+            ], key="cnn_viz_type")
+
+            model = st.session_state.cnn_model
+
+            if viz_type == "Loss & Accuracy Curves":
+                fig = plot_loss_accuracy(
+                    st.session_state.cnn_loss_history,
+                    st.session_state.cnn_acc_history,
+                    theme=_t
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
+            elif viz_type == "Feature Maps":
+                st.markdown("Upload an image to visualize intermediate feature maps.")
+                fm_file = st.file_uploader("Upload image", type=["jpg", "jpeg", "png"], key="cnn_fm_upload")
+                if fm_file:
+                    img_bytes = fm_file.read()
+                    face_crop, _, _ = detect_face_pil(img_bytes)
+                    processed = preprocess_image(face_crop, IMG_SIZE)
+                    maps = model.get_feature_maps(processed)
+
+                    for layer_name, fmap in maps.items():
+                        st.markdown(f"**{layer_name}** — shape: {fmap.shape}")
+                        n_filters = fmap.shape[2]
+                        cols = st.columns(min(n_filters, 8))
+                        for i in range(min(n_filters, 8)):
+                            with cols[i]:
+                                fig, ax = plt.subplots(figsize=(2, 2))
+                                ax.imshow(fmap[:, :, i], cmap='viridis')
+                                ax.axis('off')
+                                ax.set_title(f"F{i}", fontsize=8)
+                                st.pyplot(fig)
+                                plt.close(fig)
+
+            elif viz_type == "Conv Filters":
+                filters = model.get_filters()
+                for layer_name, f in filters.items():
+                    st.markdown(f"**{layer_name}** — {f.shape[0]} filters, shape {f.shape[1]}x{f.shape[2]}")
+                    n = f.shape[0]
+                    cols = st.columns(min(n, 8))
+                    for i in range(min(n, 8)):
+                        with cols[i]:
+                            fig, ax = plt.subplots(figsize=(2, 2))
+                            ax.imshow(f[i, :, :, 0], cmap='gray')
+                            ax.axis('off')
+                            ax.set_title(f"F{i}", fontsize=8)
+                            st.pyplot(fig)
+                            plt.close(fig)
+
+            elif viz_type == "Confusion Matrix":
+                train_images = st.session_state.cnn_train_images
+                train_labels = st.session_state.cnn_train_labels
+                class_names = st.session_state.cnn_class_names
+                y_true = train_labels
+                y_pred = []
+                for img in train_images:
+                    pred_class, _, _ = model.predict(img)
+                    y_pred.append(pred_class)
+                fig = plot_confusion_matrix(y_true, y_pred, labels=class_names, theme=_t)
+                st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.warning("Train the model first to see visualizations.")
+
+    # ── Tab 4: Architecture ─────────────────────────────────
+    with tab4:
+        st.subheader("CNN Architecture")
+        st.caption("Drag nodes to move, scroll to zoom")
+        components.html(cnn_diagram(), height=520)
+
+        st.divider()
+        st.subheader("Step 1: Convolution (Forward Pass)")
+        st.latex(r"\text{output}(i,j,f) = \sum_{m}\sum_{n}\sum_{c} \text{input}(i{+}m, j{+}n, c) \cdot \text{filter}(m,n,c,f) + b_f")
+        st.code("""# im2col: extract all patches as matrix rows
+cols = im2col(padded_input, kernel_size, stride)
+# Matrix multiply: output = cols @ filters + biases
+output = cols @ W + biases""", language="python")
+
+        st.divider()
+        st.subheader("Step 2: ReLU Activation")
+        st.latex(r"\text{ReLU}(x) = \max(0, x)")
+
+        st.divider()
+        st.subheader("Step 3: Max Pooling")
+        st.latex(r"\text{MaxPool}(x) = \max_{(m,n) \in \text{window}} x(m,n)")
+        st.code("""# 2x2 max pooling reduces spatial dimensions by half
+output[i,j] = max(input[2i:2i+2, 2j:2j+2])""", language="python")
+
+        st.divider()
+        st.subheader("Step 4: Softmax + Cross-Entropy Loss")
+        st.latex(r"\text{softmax}(z_i) = \frac{e^{z_i}}{\sum_j e^{z_j}}")
+        st.latex(r"\mathcal{L} = -\log(\text{softmax}(z)_{\text{true class}})")
+
+        st.divider()
+        st.subheader("Step 5: Backpropagation")
+        st.markdown("Gradients flow backwards through each layer using the chain rule, updating filters and weights via gradient descent.")
+        st.code("""# Gradient of cross-entropy + softmax
+d = probs.copy()
+d[true_label] -= 1
+
+# Backprop through each layer in reverse
+for layer in reversed(layers):
+    d = layer.backward(d, learning_rate)""", language="python")
+
+    # ── Tab 5: Live Attendance ─────────────────────────────────
+    with tab5:
+        import datetime, cv2, io
+        from PIL import Image as PILImage
+
+        st.subheader("Live Attendance System")
+
+        if st.session_state.get("model_type") != "cnn" or not st.session_state.get("trained"):
+            st.warning("Train the CNN model first (Tab 1) before using live attendance.")
+        else:
+            model = st.session_state.cnn_model
+            class_names = st.session_state.cnn_class_names
+
+            # Initialize attendance log
+            if "attendance_log" not in st.session_state:
+                st.session_state.attendance_log = []
+
+            conf_threshold = st.slider(
+                "Confidence Threshold", 0.50, 0.99, 0.70, 0.05,
+                help="Only mark attendance if confidence exceeds this threshold",
+                key="att_conf_threshold"
+            )
+
+            st.divider()
+            st.markdown("**Capture a photo from your webcam to mark attendance:**")
+
+            camera_img = st.camera_input("Take a photo", key="att_camera")
+
+            if camera_img is not None:
+                img_bytes = camera_img.getvalue()
+
+                # Detect face and preprocess
+                face_crop, bbox, full_img = detect_face_pil(img_bytes)
+                processed = preprocess_image(face_crop, IMG_SIZE)
+
+                # Predict
+                pred_class, confidence, probs = model.predict(processed)
+                pred_name = class_names[pred_class]
+
+                # Show detection results
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    # Draw bounding box on original image
+                    annotated = full_img.copy()
+                    x, y, w, h = bbox
+                    cv2.rectangle(annotated, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                    label_text = f"{pred_name} ({confidence:.0%})"
+                    cv2.putText(annotated, label_text, (x, y - 10),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                    st.image(annotated, caption="Detected Face", use_container_width=True)
+                with col_b:
+                    st.image(face_crop, caption="Cropped Face", use_container_width=True)
+                    st.markdown(f"**Identified:** {pred_name}")
+                    st.markdown(f"**Confidence:** {confidence:.2%}")
+
+                    # Class probabilities
+                    prob_data = {class_names[i]: float(probs[i]) for i in range(len(class_names))}
+                    st.bar_chart(prob_data)
+
+                # Mark attendance
+                if confidence >= conf_threshold:
+                    now = datetime.datetime.now()
+                    # Check if this person was already marked in the last 5 minutes
+                    already_marked = False
+                    for entry in st.session_state.attendance_log:
+                        if entry["Name"] == pred_name:
+                            prev_time = datetime.datetime.strptime(entry["Time"], "%Y-%m-%d %H:%M:%S")
+                            if (now - prev_time).total_seconds() < 300:
+                                already_marked = True
+                                break
+
+                    if already_marked:
+                        st.info(f"{pred_name} was already marked present within the last 5 minutes.")
+                    else:
+                        st.session_state.attendance_log.append({
+                            "Name": pred_name,
+                            "Time": now.strftime("%Y-%m-%d %H:%M:%S"),
+                            "Confidence": f"{confidence:.2%}"
+                        })
+                        st.success(f"Attendance marked for **{pred_name}** at {now.strftime('%H:%M:%S')}")
+                else:
+                    st.warning(f"Confidence ({confidence:.2%}) is below threshold ({conf_threshold:.0%}). Attendance NOT marked.")
+
+            # ── Attendance Log ──
+            st.divider()
+            st.subheader("Attendance Log")
+
+            if st.session_state.attendance_log:
+                log_df = pd.DataFrame(st.session_state.attendance_log)
+                st.dataframe(log_df, use_container_width=True)
+
+                # Summary
+                st.markdown(f"**Total entries:** {len(log_df)} | **Unique people:** {log_df['Name'].nunique()}")
+
+                # Download as CSV
+                csv = log_df.to_csv(index=False)
+                st.download_button(
+                    "Download Attendance CSV",
+                    csv,
+                    file_name=f"attendance_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                    mime="text/csv",
+                    key="att_download"
+                )
+
+                # Clear log
+                if st.button("Clear Attendance Log", key="att_clear"):
+                    st.session_state.attendance_log = []
+                    st.rerun()
+            else:
+                st.info("No attendance recorded yet. Capture a photo above to start.")
+
+# ============================================
+# HOPFIELD NETWORK — Alphabet Recognition
+# ============================================
+elif model_type == "Hopfield Network (Alphabet)":
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from streamlit_drawable_canvas import st_canvas
+    from PIL import Image as PILImage
+
+    st.title("Hopfield Network — Alphabet Recognition")
+
+    st.sidebar.header("Hopfield Parameters")
+    hop_letters = st.sidebar.multiselect(
+        "Letters to store",
+        list(ALPHABET_PATTERNS.keys()),
+        default=["A", "B", "C", "D", "E"],
+        key="hop_letters"
+    )
+    hop_noise = st.sidebar.slider("Noise Level (for testing)", 0.0, 0.5, 0.15, 0.05, key="hop_noise")
+    hop_max_iter = st.sidebar.number_input("Max Recall Iterations", 1, 100, 20, key="hop_max_iter")
+
+    _t = st.session_state.theme
+
+    tab1, tab2, tab3, tab4 = st.tabs(["Draw & Recognize", "Stored Patterns", "Noise Test", "How It Works"])
+
+    # Train the network with selected letters
+    if len(hop_letters) >= 1:
+        patterns = {letter: get_pattern_vector(letter) for letter in hop_letters}
+        hopfield_net = HopfieldNetwork(PATTERN_SIZE)
+        hopfield_net.train(patterns)
+        st.session_state.hopfield_net = hopfield_net
+        st.session_state.hop_patterns = patterns
+
+    # ── Tab 1: Draw & Recognize ────────────────────────────────
+    with tab1:
+        st.subheader("Draw an Alphabet Letter")
+        st.markdown(f"The network has **{len(hop_letters)} letters** stored: {', '.join(hop_letters)}")
+        st.markdown("Draw a letter on the canvas below. The grid is 10x10 — fill in the cells to form a letter shape.")
+
+        CELL_SIZE = 40
+        CANVAS_SIZE = GRID_SIZE * CELL_SIZE  # 400px
+
+        col_draw, col_result = st.columns([1, 1])
+
+        with col_draw:
+            st.markdown("**Draw here** (use the brush to fill cells):")
+            canvas_result = st_canvas(
+                fill_color="rgba(255, 255, 255, 0.0)",
+                stroke_width=CELL_SIZE - 2,
+                stroke_color="#FFFFFF",
+                background_color="#1a1a2e",
+                width=CANVAS_SIZE,
+                height=CANVAS_SIZE,
+                drawing_mode="freedraw",
+                key="hopfield_canvas",
+            )
+
+            if st.button("Recognize", key="hop_recognize"):
+                if canvas_result.image_data is not None:
+                    # Convert canvas to 10x10 grid
+                    img_array = canvas_result.image_data[:, :, :3]  # drop alpha
+                    brightness = np.mean(img_array, axis=2)  # grayscale
+
+                    # Downsample to 10x10
+                    grid = np.zeros((GRID_SIZE, GRID_SIZE))
+                    for r in range(GRID_SIZE):
+                        for c in range(GRID_SIZE):
+                            block = brightness[
+                                r * CELL_SIZE:(r + 1) * CELL_SIZE,
+                                c * CELL_SIZE:(c + 1) * CELL_SIZE
+                            ]
+                            grid[r, c] = np.mean(block)
+
+                    # Convert to bipolar: bright pixels → +1, dark → -1
+                    threshold = (grid.max() + grid.min()) / 2
+                    if grid.max() - grid.min() < 10:
+                        threshold = 50
+                    bipolar = np.where(grid > threshold, 1.0, -1.0).flatten()
+
+                    st.session_state.hop_input = bipolar
+                    st.session_state.hop_input_grid = np.where(grid > threshold, 1, 0)
+
+                    # Recall
+                    net = st.session_state.hopfield_net
+                    recalled, energy_hist, snapshots = net.recall(bipolar, max_iterations=hop_max_iter)
+                    label, similarity = net.identify(recalled)
+
+                    st.session_state.hop_recalled = recalled
+                    st.session_state.hop_energy = energy_hist
+                    st.session_state.hop_snapshots = snapshots
+                    st.session_state.hop_label = label
+                    st.session_state.hop_similarity = similarity
+                else:
+                    st.warning("Please draw something on the canvas first.")
+
+        with col_result:
+            if "hop_label" in st.session_state:
+                label = st.session_state.hop_label
+                similarity = st.session_state.hop_similarity
+                recalled = st.session_state.hop_recalled
+                input_grid = st.session_state.hop_input_grid
+                energy_hist = st.session_state.hop_energy
+
+                st.markdown(f"### Recognized: **{label}**")
+                st.markdown(f"**Similarity:** {similarity:.2%}")
+                st.markdown(f"**Converged in:** {len(energy_hist) - 1} iterations")
+
+                # Show input vs recalled vs stored
+                fig, axes = plt.subplots(1, 3, figsize=(9, 3))
+                bg = '#1a1a2e' if _t == 'dark' else '#ffffff'
+                fig.patch.set_facecolor(bg)
+
+                # Input
+                axes[0].imshow(input_grid.reshape(GRID_SIZE, GRID_SIZE),
+                               cmap='Blues', interpolation='nearest', vmin=0, vmax=1)
+                axes[0].set_title("Your Drawing", color='white' if _t == 'dark' else 'black', fontsize=11)
+                axes[0].set_xticks([])
+                axes[0].set_yticks([])
+                # Add grid lines
+                for ax in axes:
+                    ax.set_xticks(np.arange(-0.5, GRID_SIZE, 1), minor=True)
+                    ax.set_yticks(np.arange(-0.5, GRID_SIZE, 1), minor=True)
+                    ax.grid(which='minor', color='gray', linewidth=0.5)
+                    ax.tick_params(which='minor', size=0)
+                    ax.set_facecolor(bg)
+
+                # Recalled
+                recalled_grid = ((recalled + 1) / 2).reshape(GRID_SIZE, GRID_SIZE)
+                axes[1].imshow(recalled_grid, cmap='Greens', interpolation='nearest', vmin=0, vmax=1)
+                axes[1].set_title("Recalled", color='white' if _t == 'dark' else 'black', fontsize=11)
+                axes[1].set_xticks([])
+                axes[1].set_yticks([])
+
+                # Stored
+                stored = st.session_state.hop_patterns[label]
+                stored_grid = ((stored + 1) / 2).reshape(GRID_SIZE, GRID_SIZE)
+                axes[2].imshow(stored_grid, cmap='Oranges', interpolation='nearest', vmin=0, vmax=1)
+                axes[2].set_title(f"Stored '{label}'", color='white' if _t == 'dark' else 'black', fontsize=11)
+                axes[2].set_xticks([])
+                axes[2].set_yticks([])
+
+                plt.tight_layout()
+                st.pyplot(fig)
+                plt.close(fig)
+
+                # Energy curve
+                st.markdown("**Energy Convergence:**")
+                fig2, ax2 = plt.subplots(figsize=(6, 2.5))
+                fig2.patch.set_facecolor(bg)
+                ax2.set_facecolor(bg)
+                ax2.plot(energy_hist, marker='o', color='#4CAF50', linewidth=2, markersize=5)
+                ax2.set_xlabel("Iteration", color='white' if _t == 'dark' else 'black')
+                ax2.set_ylabel("Energy", color='white' if _t == 'dark' else 'black')
+                ax2.tick_params(colors='white' if _t == 'dark' else 'black')
+                ax2.grid(True, alpha=0.3)
+                plt.tight_layout()
+                st.pyplot(fig2)
+                plt.close(fig2)
+
+    # ── Tab 2: Stored Patterns ─────────────────────────────────
+    with tab2:
+        st.subheader("Stored Alphabet Patterns")
+        st.markdown(f"Currently storing **{len(hop_letters)}** letters. Select letters from the sidebar.")
+
+        if len(hop_letters) > 0:
+            # Display patterns in a grid
+            cols_per_row = 5
+            for row_start in range(0, len(hop_letters), cols_per_row):
+                row_letters = hop_letters[row_start:row_start + cols_per_row]
+                cols = st.columns(cols_per_row)
+                for i, letter in enumerate(row_letters):
+                    with cols[i]:
+                        pattern = get_pattern_vector(letter)
+                        grid = ((pattern + 1) / 2).reshape(GRID_SIZE, GRID_SIZE)
+                        fig, ax = plt.subplots(figsize=(2.5, 2.5))
+                        bg = '#1a1a2e' if _t == 'dark' else '#ffffff'
+                        fig.patch.set_facecolor(bg)
+                        ax.set_facecolor(bg)
+                        ax.imshow(grid, cmap='YlOrRd', interpolation='nearest', vmin=0, vmax=1)
+                        ax.set_title(letter, fontsize=18, fontweight='bold',
+                                     color='white' if _t == 'dark' else 'black')
+                        ax.set_xticks(np.arange(-0.5, GRID_SIZE, 1), minor=True)
+                        ax.set_yticks(np.arange(-0.5, GRID_SIZE, 1), minor=True)
+                        ax.grid(which='minor', color='gray', linewidth=0.5)
+                        ax.tick_params(which='minor', size=0)
+                        ax.set_xticks([])
+                        ax.set_yticks([])
+                        plt.tight_layout()
+                        st.pyplot(fig)
+                        plt.close(fig)
+
+            # Weight matrix visualization
+            st.divider()
+            st.subheader("Weight Matrix")
+            st.markdown("The Hopfield weight matrix shows connection strengths between all 100 neurons (10x10 grid).")
+            fig, ax = plt.subplots(figsize=(6, 5))
+            bg = '#1a1a2e' if _t == 'dark' else '#ffffff'
+            fig.patch.set_facecolor(bg)
+            ax.set_facecolor(bg)
+            net = st.session_state.hopfield_net
+            im = ax.imshow(net.weights, cmap='RdBu', interpolation='nearest', aspect='auto')
+            ax.set_title("Weight Matrix (100x100)", color='white' if _t == 'dark' else 'black')
+            ax.set_xlabel("Neuron j", color='white' if _t == 'dark' else 'black')
+            ax.set_ylabel("Neuron i", color='white' if _t == 'dark' else 'black')
+            ax.tick_params(colors='white' if _t == 'dark' else 'black')
+            plt.colorbar(im, ax=ax)
+            plt.tight_layout()
+            st.pyplot(fig)
+            plt.close(fig)
+
+            # Capacity info
+            st.divider()
+            st.info(f"**Hopfield capacity rule:** A network with {PATTERN_SIZE} neurons can reliably store ~{int(PATTERN_SIZE / (2 * np.log(PATTERN_SIZE)))} patterns. You have {len(hop_letters)} stored.")
+
+    # ── Tab 3: Noise Test ──────────────────────────────────────
+    with tab3:
+        st.subheader("Noise Robustness Test")
+        st.markdown("See how well the network recovers letters from noisy (corrupted) inputs.")
+
+        if len(hop_letters) >= 1:
+            test_letter = st.selectbox("Select letter to test", hop_letters, key="hop_test_letter")
+
+            if st.button("Run Noise Test", key="hop_noise_test"):
+                net = st.session_state.hopfield_net
+                original = get_pattern_vector(test_letter)
+
+                noise_levels = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]
+                fig, axes = plt.subplots(2, len(noise_levels), figsize=(15, 6))
+                bg = '#1a1a2e' if _t == 'dark' else '#ffffff'
+                fig.patch.set_facecolor(bg)
+
+                for i, nl in enumerate(noise_levels):
+                    if nl == 0:
+                        noisy = original.copy()
+                    else:
+                        noisy = net.add_noise(original, nl)
+
+                    recalled, energy, _ = net.recall(noisy, max_iterations=hop_max_iter)
+                    label, sim = net.identify(recalled)
+
+                    # Noisy input
+                    noisy_grid = ((noisy + 1) / 2).reshape(GRID_SIZE, GRID_SIZE)
+                    axes[0, i].imshow(noisy_grid, cmap='Blues', interpolation='nearest', vmin=0, vmax=1)
+                    axes[0, i].set_title(f"Noise: {nl:.0%}",
+                                         color='white' if _t == 'dark' else 'black', fontsize=10)
+                    axes[0, i].set_xticks([])
+                    axes[0, i].set_yticks([])
+                    axes[0, i].set_facecolor(bg)
+
+                    # Recalled output
+                    recalled_grid = ((recalled + 1) / 2).reshape(GRID_SIZE, GRID_SIZE)
+                    color = '#4CAF50' if label == test_letter else '#f44336'
+                    axes[1, i].imshow(recalled_grid, cmap='Greens', interpolation='nearest', vmin=0, vmax=1)
+                    axes[1, i].set_title(f"→ {label} ({sim:.0%})",
+                                         color=color, fontsize=10, fontweight='bold')
+                    axes[1, i].set_xticks([])
+                    axes[1, i].set_yticks([])
+                    axes[1, i].set_facecolor(bg)
+
+                axes[0, 0].set_ylabel("Input", color='white' if _t == 'dark' else 'black', fontsize=12)
+                axes[1, 0].set_ylabel("Recalled", color='white' if _t == 'dark' else 'black', fontsize=12)
+                plt.tight_layout()
+                st.pyplot(fig)
+                plt.close(fig)
+
+    # ── Tab 4: How It Works ────────────────────────────────────
+    with tab4:
+        st.subheader("How Hopfield Networks Work")
+
+        st.markdown("""
+A **Hopfield Network** is a recurrent neural network that acts as **content-addressable memory**
+(associative memory). Given a noisy or partial input, it recalls the closest stored pattern.
+        """)
+
+        st.divider()
+        st.subheader("Step 1: Hebbian Learning (Store Patterns)")
+        st.markdown("Patterns are stored by computing the weight matrix using the **Hebbian rule**:")
+        st.latex(r"W = \frac{1}{P} \sum_{p=1}^{P} \mathbf{x}^{(p)} {\mathbf{x}^{(p)}}^T, \quad W_{ii} = 0")
+        st.markdown("Where each pattern $\\mathbf{x}^{(p)}$ is a bipolar vector ($+1$ or $-1$).")
+
+        st.divider()
+        st.subheader("Step 2: Recall (Pattern Completion)")
+        st.markdown("Given a noisy input, the network iteratively updates until convergence:")
+        st.latex(r"\mathbf{s}(t+1) = \text{sign}(W \cdot \mathbf{s}(t))")
+        st.markdown("The network converges to the stored pattern that is closest to the input (a local energy minimum).")
+
+        st.divider()
+        st.subheader("Step 3: Energy Function")
+        st.markdown("The network always minimizes its energy function:")
+        st.latex(r"E = -\frac{1}{2} \mathbf{s}^T W \mathbf{s}")
+        st.markdown("Each stored pattern is a **local minimum** in the energy landscape. The recall process is like a ball rolling downhill to the nearest valley.")
+
+        st.divider()
+        st.subheader("Storage Capacity")
+        st.latex(r"P_{\max} \approx \frac{N}{2 \ln N}")
+        st.markdown(f"For a {PATTERN_SIZE}-neuron network: ~**{int(PATTERN_SIZE / (2 * np.log(PATTERN_SIZE)))}** patterns can be stored reliably.")
+        st.markdown("Storing too many patterns causes **spurious states** — the network recalls patterns that were never stored.")
