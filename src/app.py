@@ -1586,9 +1586,21 @@ elif model_type == "CNN (Face Classification)":
             st.markdown(f"**Person {c + 1}**")
             name = st.text_input(f"Name for person {c + 1}", value=f"Person {c + 1}", key=f"cnn_name_{c}")
             class_names.append(name)
-            uploaded = st.file_uploader(f"Upload images for {name}", accept_multiple_files=True, type=["jpg", "jpeg", "png"], key=f"cnn_upload_{c}")
+            
+            c_col1, c_col2 = st.columns(2)
+            with c_col1:
+                uploaded = st.file_uploader(f"Upload images for {name}", accept_multiple_files=True, type=["jpg", "jpeg", "png"], key=f"cnn_upload_{c}")
+            with c_col2:
+                camera_img = st.camera_input(f"Or take a picture for {name}", key=f"cnn_camera_{c}")
+                
+            all_files_for_class = []
             if uploaded:
-                for f in uploaded:
+                all_files_for_class.extend(uploaded)
+            if camera_img:
+                all_files_for_class.append(camera_img)
+
+            if all_files_for_class:
+                for f in all_files_for_class:
                     img_bytes = f.read()
                     face_crop, bbox, full_img = detect_face_pil(img_bytes)
                     processed = preprocess_image(face_crop, IMG_SIZE)
@@ -1600,7 +1612,7 @@ elif model_type == "CNN (Face Classification)":
                     else:
                         all_images.append(processed)
                         all_labels.append(c)
-                st.success(f"Loaded {len(uploaded)} image(s) for {name}" + (f" (augmented to {len([l for l in all_labels if l == c])} samples)" if c_augment else ""))
+                st.success(f"Loaded {len(all_files_for_class)} image(s) for {name}" + (f" (augmented to {len([l for l in all_labels if l == c])} samples)" if c_augment else ""))
 
         st.divider()
         if st.button("Train CNN", key="cnn_train_btn"):
@@ -1641,11 +1653,17 @@ elif model_type == "CNN (Face Classification)":
     # ── Tab 2: Predict ──────────────────────────────────────
     with tab2:
         if st.session_state.get("model_type") == "cnn" and st.session_state.get("trained"):
-            st.subheader("Upload a face image to classify")
-            pred_file = st.file_uploader("Upload test image", type=["jpg", "jpeg", "png"], key="cnn_pred_upload")
+            st.subheader("Upload or capture a face image to classify")
+            p_col1, p_col2 = st.columns(2)
+            with p_col1:
+                pred_file = st.file_uploader("Upload test image", type=["jpg", "jpeg", "png"], key="cnn_pred_upload")
+            with p_col2:
+                pred_cam = st.camera_input("Or take a picture", key="cnn_pred_camera")
+                
+            img_to_predict = pred_file or pred_cam
 
-            if pred_file:
-                img_bytes = pred_file.read()
+            if img_to_predict:
+                img_bytes = img_to_predict.read()
                 face_crop, bbox, full_img = detect_face_pil(img_bytes)
                 processed = preprocess_image(face_crop, IMG_SIZE)
 
