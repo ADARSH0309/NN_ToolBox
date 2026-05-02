@@ -1,14 +1,20 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
-from backprop import train_network, predict, DEFAULT_LR, DEFAULT_EPOCHS
-from perceptron import train_perceptron, predict_perceptron, DEFAULT_LR as P_DEFAULT_LR, DEFAULT_EPOCHS as P_DEFAULT_EPOCHS
-from rnn import train_rnn, DEFAULT_HIDDEN as R_DEFAULT_HIDDEN, DEFAULT_LR as R_DEFAULT_LR, DEFAULT_EPOCHS as R_DEFAULT_EPOCHS
-from lstm import train_lstm, DEFAULT_HIDDEN as L_DEFAULT_HIDDEN, DEFAULT_LR as L_DEFAULT_LR, DEFAULT_EPOCHS as L_DEFAULT_EPOCHS
-from mse import train_mse_single, predict_single, train_mse_dual, predict_dual, DEFAULT_LR as M_DEFAULT_LR, DEFAULT_EPOCHS as M_DEFAULT_EPOCHS
-from cnn import train_cnn, preprocess_image, detect_face_pil, augment_image, FaceCNN, DEFAULT_LR as C_DEFAULT_LR, DEFAULT_EPOCHS as C_DEFAULT_EPOCHS, IMG_SIZE
-from hopfield import HopfieldNetwork, ALPHABET_PATTERNS, GRID_SIZE, PATTERN_SIZE, get_pattern_vector
-from visualizations import (
+import os
+
+# Set up absolute path for data files
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+
+from models.backprop import train_network, predict, DEFAULT_LR, DEFAULT_EPOCHS
+from models.perceptron import train_perceptron, predict_perceptron, DEFAULT_LR as P_DEFAULT_LR, DEFAULT_EPOCHS as P_DEFAULT_EPOCHS
+from models.rnn import train_rnn, DEFAULT_HIDDEN as R_DEFAULT_HIDDEN, DEFAULT_LR as R_DEFAULT_LR, DEFAULT_EPOCHS as R_DEFAULT_EPOCHS
+from models.lstm import train_lstm, DEFAULT_HIDDEN as L_DEFAULT_HIDDEN, DEFAULT_LR as L_DEFAULT_LR, DEFAULT_EPOCHS as L_DEFAULT_EPOCHS
+from models.mse import train_mse_single, predict_single, train_mse_dual, predict_dual, DEFAULT_LR as M_DEFAULT_LR, DEFAULT_EPOCHS as M_DEFAULT_EPOCHS
+from models.cnn import train_cnn, preprocess_image, detect_face_pil, augment_image, FaceCNN, DEFAULT_LR as C_DEFAULT_LR, DEFAULT_EPOCHS as C_DEFAULT_EPOCHS, IMG_SIZE
+from models.hopfield import HopfieldNetwork, ALPHABET_PATTERNS, GRID_SIZE, PATTERN_SIZE, get_pattern_vector
+from utils.visualizations import (
     plot_decision_boundary, plot_confidence_heatmap, plot_weight_heatmap_mlp,
     plot_confusion_matrix, plot_activation_distribution, plot_loss_curve,
     plot_regression_line, plot_regression_3d, plot_perceptron_boundary,
@@ -401,7 +407,7 @@ if model_type == "Backpropagation":
         use_sample = st.checkbox("Use sample data instead", key="bp_sample")
 
         if use_sample:
-            df = pd.read_csv("sample_data.csv")
+            df = pd.read_csv(os.path.join(DATA_DIR, "sample_data.csv"))
             st.write("Sample Data (Student Performance):")
             st.dataframe(df, use_container_width=True)
             st.session_state.bp_df = df
@@ -666,7 +672,7 @@ elif model_type == "Perceptron":
         use_sample = st.checkbox("Use sample data instead", key="perceptron_sample")
 
         if use_sample:
-            df = pd.read_csv("sample_data.csv")
+            df = pd.read_csv(os.path.join(DATA_DIR, "sample_data.csv"))
             st.write("Sample Data (Student Performance):")
             st.dataframe(df, use_container_width=True)
             st.session_state.perceptron_df = df
@@ -838,7 +844,7 @@ elif model_type == "RNN (Sentiment Analysis)":
         use_sample = st.checkbox("Use sample sentiment data instead", key="rnn_sample")
 
         if use_sample:
-            df = pd.read_csv("sample_sentiment.csv")
+            df = pd.read_csv(os.path.join(DATA_DIR, "sample_sentiment.csv"))
             st.write("Sample Sentiment Data:")
             st.dataframe(df, use_container_width=True)
             st.session_state.rnn_df = df
@@ -1071,7 +1077,7 @@ elif model_type == "LSTM (Sentiment Analysis)":
         sample_choice = st.radio("Or use sample data:", ["None", "Sentiment Analysis", "Music Genre Classification"], key="lstm_sample_choice", horizontal=True)
 
         if sample_choice == "Sentiment Analysis":
-            df = pd.read_csv("sample_sentiment.csv")
+            df = pd.read_csv(os.path.join(DATA_DIR, "sample_sentiment.csv"))
             st.write("Sample Sentiment Data:")
             st.dataframe(df, use_container_width=True)
             st.download_button("Download Sentiment CSV", df.to_csv(index=False), "sample_sentiment.csv", "text/csv", key="dl_sentiment")
@@ -1079,7 +1085,7 @@ elif model_type == "LSTM (Sentiment Analysis)":
             st.session_state.lstm_text_col_name = "text"
             st.session_state.lstm_label_col_name = "sentiment"
         elif sample_choice == "Music Genre Classification":
-            df = pd.read_csv("sample_music_genre.csv")
+            df = pd.read_csv(os.path.join(DATA_DIR, "sample_music_genre.csv"))
             st.write("Sample Music Genre Data (0 = Calm/Soft, 1 = Heavy/Rock):")
             st.dataframe(df, use_container_width=True)
             st.download_button("Download Music Genre CSV", df.to_csv(index=False), "sample_music_genre.csv", "text/csv", key="dl_music")

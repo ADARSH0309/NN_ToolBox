@@ -1,10 +1,9 @@
 import numpy as np
 import re
 
-# ─── Defaults ───────────────────────────────────────────────
 DEFAULT_HIDDEN = 64
-DEFAULT_LR = 0.005
-DEFAULT_EPOCHS = 30
+DEFAULT_LR = 0.05
+DEFAULT_EPOCHS = 50
 
 # ─── Text helpers ───────────────────────────────────────────
 def tokenize(text):

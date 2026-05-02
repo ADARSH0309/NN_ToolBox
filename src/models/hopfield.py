@@ -339,17 +339,17 @@ class HopfieldNetwork:
 
     def train(self, patterns_dict):
         """
-        Train with Hebbian rule: W = (1/N) * sum(p * p^T) with zero diagonal.
+        Train with Pseudo-inverse (Projection) rule for better capacity with correlated patterns.
         patterns_dict: {letter: bipolar_vector}
         """
         self.stored_patterns = dict(patterns_dict)
-        self.weights = np.zeros((self.size, self.size))
+        
+        if not patterns_dict:
+            self.weights = np.zeros((self.size, self.size))
+            return
 
-        for label, pattern in patterns_dict.items():
-            p = pattern.reshape(-1, 1)
-            self.weights += p @ p.T
-
-        self.weights /= len(patterns_dict)
+        P = np.column_stack(list(patterns_dict.values()))
+        self.weights = P @ np.linalg.pinv(P)
         np.fill_diagonal(self.weights, 0)
 
     def recall(self, pattern, max_iterations=20):
