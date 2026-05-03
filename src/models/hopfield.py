@@ -337,10 +337,10 @@ class HopfieldNetwork:
         self.weights = np.zeros((size, size))
         self.stored_patterns = {}
 
-    def train(self, patterns_dict):
+    def train(self, patterns_dict, rule="pseudo-inverse"):
         """
-        Train with Pseudo-inverse (Projection) rule for better capacity with correlated patterns.
-        patterns_dict: {letter: bipolar_vector}
+        Train the network with the specified rule.
+        rule: "hebbian" or "pseudo-inverse" (default)
         """
         self.stored_patterns = dict(patterns_dict)
         
@@ -349,12 +349,22 @@ class HopfieldNetwork:
             return
 
         P = np.column_stack(list(patterns_dict.values()))
-        self.weights = P @ np.linalg.pinv(P)
+        
+        if rule == "hebbian":
+            # Hebbian rule: W = (1/N) * sum(p * p^T)
+            # This is equivalent to (P @ P.T) / self.size
+            self.weights = (P @ P.T) / self.size
+        else:
+            # Pseudo-inverse (Projection) rule: W = P @ pinv(P)
+            # Better for correlated patterns (like alphabet letters)
+            self.weights = P @ np.linalg.pinv(P)
+            
         np.fill_diagonal(self.weights, 0)
 
-    def recall(self, pattern, max_iterations=20):
+    def recall(self, pattern, max_iterations=20, asynchronous=True):
         """
-        Synchronous update until convergence.
+        Recall a stored pattern from a noisy input.
+        Uses asynchronous update by default for better convergence behavior.
         Returns: (recalled_pattern, energy_history, iteration_snapshots)
         """
         state = pattern.copy().astype(np.float64)
@@ -362,14 +372,21 @@ class HopfieldNetwork:
         snapshots = [state.copy()]
 
         for i in range(max_iterations):
-            new_state = np.sign(self.weights @ state)
-            new_state[new_state == 0] = 1  # break ties to +1
-            energy_history.append(self._energy(new_state))
-            snapshots.append(new_state.copy())
+            previous_state = state.copy()
 
-            if np.array_equal(new_state, state):
+            if asynchronous:
+                for idx in np.random.permutation(self.size):
+                    activation = self.weights[idx] @ state
+                    state[idx] = 1.0 if activation >= 0 else -1.0
+            else:
+                state = np.sign(self.weights @ state)
+                state[state == 0] = 1
+
+            energy_history.append(self._energy(state))
+            snapshots.append(state.copy())
+
+            if np.array_equal(state, previous_state):
                 break
-            state = new_state
 
         return state, energy_history, snapshots
 

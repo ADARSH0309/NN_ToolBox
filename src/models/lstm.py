@@ -2,7 +2,7 @@ import numpy as np
 import re
 
 DEFAULT_HIDDEN = 64
-DEFAULT_LR = 0.05
+DEFAULT_LR = 0.01  # Reduced from 0.05 for stability
 DEFAULT_EPOCHS = 50
 
 # ─── Text helpers ───────────────────────────────────────────

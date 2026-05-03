@@ -1,15 +1,19 @@
 import random
+import math
 
-def random_weight():
-    return round(random.uniform(-1, 1), 4)
+def random_weight_xavier(fan_in, fan_out):
+    """Xavier initialization for better convergence"""
+    limit = math.sqrt(6.0 / (fan_in + fan_out))
+    return round(random.uniform(-limit, limit), 6)
 
-lr = 0.01
+lr = 0.02  # Reduced from 0.01 for stability
 epochs = 500
 
 def train_network(X, Y, l_rate=None, n_epochs=None):
-
-    w1=random_weight();w2=random_weight();w3=random_weight();w4=random_weight()
-    w5=random_weight();w6=random_weight()
+    # Xavier initialization: 2 inputs + bias -> 2 hidden
+    w1=random_weight_xavier(3, 2);w2=random_weight_xavier(3, 2);w3=random_weight_xavier(3, 2);w4=random_weight_xavier(3, 2)
+    # 2 hidden -> 1 output
+    w5=random_weight_xavier(2, 1);w6=random_weight_xavier(2, 1)
     bh1=0.0;bh2=0.0;bo=0.0
 
     w1_init=w1;w2_init=w2;w3_init=w3;w4_init=w4;w5_init=w5;w6_init=w6

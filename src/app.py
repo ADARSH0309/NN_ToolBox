@@ -1945,6 +1945,13 @@ elif model_type == "Hopfield Network (Alphabet)":
     )
     hop_noise = st.sidebar.slider("Noise Level (for testing)", 0.0, 0.5, 0.15, 0.05, key="hop_noise")
     hop_max_iter = st.sidebar.number_input("Max Recall Iterations", 1, 100, 20, key="hop_max_iter")
+    hop_rule = st.sidebar.selectbox(
+        "Training Rule",
+        ["pseudo-inverse", "hebbian"],
+        index=0,
+        help="Pseudo-inverse has higher capacity and handles correlated patterns better than Hebbian.",
+        key="hop_rule"
+    )
 
     _t = st.session_state.theme
 
@@ -1954,7 +1961,7 @@ elif model_type == "Hopfield Network (Alphabet)":
     if len(hop_letters) >= 1:
         patterns = {letter: get_pattern_vector(letter) for letter in hop_letters}
         hopfield_net = HopfieldNetwork(PATTERN_SIZE)
-        hopfield_net.train(patterns)
+        hopfield_net.train(patterns, rule=hop_rule)
         st.session_state.hopfield_net = hopfield_net
         st.session_state.hop_patterns = patterns
 
@@ -1988,7 +1995,7 @@ elif model_type == "Hopfield Network (Alphabet)":
                     img_array = canvas_result.image_data[:, :, :3]  # drop alpha
                     brightness = np.mean(img_array, axis=2)  # grayscale
 
-                    # Downsample to 10x10
+                    # Downsample to 10x10 using fill ratio per cell
                     grid = np.zeros((GRID_SIZE, GRID_SIZE))
                     for r in range(GRID_SIZE):
                         for c in range(GRID_SIZE):
@@ -1996,20 +2003,17 @@ elif model_type == "Hopfield Network (Alphabet)":
                                 r * CELL_SIZE:(r + 1) * CELL_SIZE,
                                 c * CELL_SIZE:(c + 1) * CELL_SIZE
                             ]
-                            grid[r, c] = np.mean(block)
+                            filled = np.mean(block > 127)
+                            grid[r, c] = 1 if filled >= 0.15 else -1
 
-                    # Convert to bipolar: bright pixels → +1, dark → -1
-                    threshold = (grid.max() + grid.min()) / 2
-                    if grid.max() - grid.min() < 10:
-                        threshold = 50
-                    bipolar = np.where(grid > threshold, 1.0, -1.0).flatten()
+                    bipolar = grid.flatten()
 
                     st.session_state.hop_input = bipolar
-                    st.session_state.hop_input_grid = np.where(grid > threshold, 1, 0)
+                    st.session_state.hop_input_grid = (grid == 1).astype(int)
 
                     # Recall
                     net = st.session_state.hopfield_net
-                    recalled, energy_hist, snapshots = net.recall(bipolar, max_iterations=hop_max_iter)
+                    recalled, energy_hist, snapshots = net.recall(bipolar, max_iterations=hop_max_iter, asynchronous=True)
                     label, similarity = net.identify(recalled)
 
                     st.session_state.hop_recalled = recalled
@@ -2162,7 +2166,7 @@ elif model_type == "Hopfield Network (Alphabet)":
                     else:
                         noisy = net.add_noise(original, nl)
 
-                    recalled, energy, _ = net.recall(noisy, max_iterations=hop_max_iter)
+                    recalled, energy, _ = net.recall(noisy, max_iterations=hop_max_iter, asynchronous=True)
                     label, sim = net.identify(recalled)
 
                     # Noisy input
@@ -2200,10 +2204,16 @@ A **Hopfield Network** is a recurrent neural network that acts as **content-addr
         """)
 
         st.divider()
-        st.subheader("Step 1: Hebbian Learning (Store Patterns)")
-        st.markdown("Patterns are stored by computing the weight matrix using the **Hebbian rule**:")
-        st.latex(r"W = \frac{1}{P} \sum_{p=1}^{P} \mathbf{x}^{(p)} {\mathbf{x}^{(p)}}^T, \quad W_{ii} = 0")
-        st.markdown("Where each pattern $\\mathbf{x}^{(p)}$ is a bipolar vector ($+1$ or $-1$).")
+        st.subheader("Step 1: Storing Patterns")
+        st.markdown("Patterns are stored by computing the weight matrix. Two common rules are supported in this toolbox:")
+        
+        st.markdown("**1. Hebbian Learning (Classic):**")
+        st.latex(r"W = \frac{1}{N} \sum_{p=1}^{P} \mathbf{x}^{(p)} {\mathbf{x}^{(p)}}^T, \quad W_{ii} = 0")
+        st.markdown("Simple and biologically plausible, but has low capacity and struggles with correlated patterns (like alphabet letters).")
+        
+        st.markdown("**2. Pseudo-inverse (Projection) Rule:**")
+        st.latex(r"W = P P^+, \quad W_{ii} = 0")
+        st.markdown("Where $P$ is the matrix of patterns and $P^+$ is its pseudo-inverse. This rule can store up to $N$ patterns and handles correlated letters much better by orthogonalizing the weight space.")
 
         st.divider()
         st.subheader("Step 2: Recall (Pattern Completion)")
@@ -2220,5 +2230,5 @@ A **Hopfield Network** is a recurrent neural network that acts as **content-addr
         st.divider()
         st.subheader("Storage Capacity")
         st.latex(r"P_{\max} \approx \frac{N}{2 \ln N}")
-        st.markdown(f"For a {PATTERN_SIZE}-neuron network: ~**{int(PATTERN_SIZE / (2 * np.log(PATTERN_SIZE)))}** patterns can be stored reliably.")
-        st.markdown("Storing too many patterns causes **spurious states** — the network recalls patterns that were never stored.")
+        st.markdown(f"For a {PATTERN_SIZE}-neuron network using Hebbian learning: ~**{int(PATTERN_SIZE / (2 * np.log(PATTERN_SIZE)))}** patterns can be stored reliably.")
+        st.markdown("Storing too many patterns causes **spurious states** — the network recalls patterns that were never stored or gets stuck in random noise.")
